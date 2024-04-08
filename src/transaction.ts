@@ -13,6 +13,7 @@ export type Transaction<T extends any[], R> = (ctxt: TransactionContext<any>, ..
 export interface TransactionConfig {
   isolationLevel?: IsolationLevel;
   readOnly?: boolean;
+  storedProc?: string;
 }
 
 export const IsolationLevel = {
