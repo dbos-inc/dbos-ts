@@ -329,6 +329,25 @@ export class WorkflowContextImpl extends DBOSContextImpl implements WorkflowCont
           await this.flushResultBuffer(client);
         }
 
+        if (txnInfo.config.storedProc) {
+          const $args = [this.presetUUID, this.workflowUUID, funcId, ...args]
+          const sql = `CALL ${txnInfo.config.storedProc}(${$args.map((v, i) => `$${i + 1}`).join()});` ;
+          const _result = await this.#dbosExec.userDatabase.queryWithClient(client, sql, ...$args);
+
+          
+          
+          // const rows = await this.#dbosExec.userDatabase.queryWithClient<transaction_outputs>(
+          //   client, 
+          //   `CALL `, 
+          //   ... $args);
+
+          throw new Error("foo!");
+          // this.presetUUID, this.workflowUUID, funcID, 
+          // 
+
+          
+        }
+
         // Execute the user's transaction.
         const result = await txn(tCtxt, ...args);
 

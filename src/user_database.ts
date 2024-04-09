@@ -75,15 +75,17 @@ export class PGNodeUserDatabase implements UserDatabase {
     try {
       const readOnly = config.readOnly ?? false;
       const isolationLevel = config.isolationLevel ?? IsolationLevel.Serializable;
-      await client.query(`BEGIN ISOLATION LEVEL ${isolationLevel}`);
-      if (readOnly) {
-        await client.query(`SET TRANSACTION READ ONLY`);
+      if (!config.storedProc) {
+        await client.query(`BEGIN ISOLATION LEVEL ${isolationLevel}`);
+        if (readOnly) {
+          await client.query(`SET TRANSACTION READ ONLY`);
+        }
       }
       const result: R = await txn(client, ...args);
-      await client.query(`COMMIT`);
+      if (!config.storedProc) { await client.query(`COMMIT`); }
       return result;
     } catch (err) {
-      await client.query(`ROLLBACK`);
+      if (!config.storedProc) { await client.query(`ROLLBACK`); }
       throw err;
     } finally {
       client.release();
@@ -92,12 +94,10 @@ export class PGNodeUserDatabase implements UserDatabase {
 
   async queryFunction<C extends UserDatabaseClient, R, T extends unknown[]>(func: UserDatabaseQuery<C, R, T>, ...args: T): Promise<R> {
     const client: PoolClient = await this.pool.connect();
-    try
-    {
-       return func(client as C, ...args);
+    try {
+      return func(client as C, ...args);
     }
-    finally
-    {
+    finally {
       client.release();
     }
   }
@@ -405,7 +405,7 @@ export class KnexUserDatabase implements UserDatabase {
       async (transactionClient: Knex.Transaction) => {
         return await func(transactionClient as unknown as C, ...args);
       },
-      { isolationLevel: "read committed", readOnly : true }
+      { isolationLevel: "read committed", readOnly: true }
     );
     return result;
   }
