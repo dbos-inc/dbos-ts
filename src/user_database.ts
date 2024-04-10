@@ -75,16 +75,21 @@ export class PGNodeUserDatabase implements UserDatabase {
     try {
       const readOnly = config.readOnly ?? false;
       const isolationLevel = config.isolationLevel ?? IsolationLevel.Serializable;
+
+      // if stored proc is specified, assume it handles transaction management
       if (!config.storedProc) {
         await client.query(`BEGIN ISOLATION LEVEL ${isolationLevel}`);
-        if (readOnly) {
-          await client.query(`SET TRANSACTION READ ONLY`);
-        }
+        // TODO: this should be combined with previous statement to save a DB round trip
+        //       PG simple queries support multiple statements separated by semicolon
+        //       as long as they don't have parameters
+        if (readOnly) { await client.query(`SET TRANSACTION READ ONLY`); }
       }
       const result: R = await txn(client, ...args);
+      // see above regarding tx management in stored proc cases
       if (!config.storedProc) { await client.query(`COMMIT`); }
       return result;
     } catch (err) {
+      // see above regarding tx management in stored proc cases
       if (!config.storedProc) { await client.query(`ROLLBACK`); }
       throw err;
     } finally {
@@ -380,6 +385,10 @@ export class KnexUserDatabase implements UserDatabase {
   }
 
   async transaction<R, T extends unknown[]>(transactionFunction: UserDatabaseTransaction<R, T>, config: TransactionConfig, ...args: T): Promise<R> {
+    if (config.storedProc) {
+      return await transactionFunction(this.knex, ...args);
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     let isolationLevel: Knex.IsolationLevels;
     if (config.isolationLevel === IsolationLevel.ReadUncommitted) {

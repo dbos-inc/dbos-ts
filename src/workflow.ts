@@ -297,6 +297,13 @@ export class WorkflowContextImpl extends DBOSContextImpl implements WorkflowCont
     // eslint-disable-next-line no-constant-condition
     while (true) {
       const wrappedTransaction = async (client: UserDatabaseClient): Promise<R> => {
+        if (txnInfo.config.storedProc) {
+          const $args = [this.workflowUUID, funcId, this.presetUUID, ...args, null]
+          const sql = `CALL ${txnInfo.config.storedProc}(${$args.map((v, i) => `$${i + 1}`).join()});` ;
+          const [ queryResult ] = await this.#dbosExec.userDatabase.queryWithClient<{results: R}>(client, sql, ...$args) ;
+          return queryResult.results;
+        }
+
         const tCtxt = new TransactionContextImpl(
           this.#dbosExec.userDatabase.getName(), client, this,
           span, this.#dbosExec.logger, funcId, txn.name,
@@ -327,25 +334,6 @@ export class WorkflowContextImpl extends DBOSContextImpl implements WorkflowCont
         // For non-read-only transactions, flush the result buffer, including the guard if present.
         if (!readOnly) {
           await this.flushResultBuffer(client);
-        }
-
-        if (txnInfo.config.storedProc) {
-          const $args = [this.presetUUID, this.workflowUUID, funcId, ...args]
-          const sql = `CALL ${txnInfo.config.storedProc}(${$args.map((v, i) => `$${i + 1}`).join()});` ;
-          const _result = await this.#dbosExec.userDatabase.queryWithClient(client, sql, ...$args);
-
-          
-          
-          // const rows = await this.#dbosExec.userDatabase.queryWithClient<transaction_outputs>(
-          //   client, 
-          //   `CALL `, 
-          //   ... $args);
-
-          throw new Error("foo!");
-          // this.presetUUID, this.workflowUUID, funcID, 
-          // 
-
-          
         }
 
         // Execute the user's transaction.
