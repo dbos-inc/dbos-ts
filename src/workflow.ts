@@ -300,8 +300,15 @@ export class WorkflowContextImpl extends DBOSContextImpl implements WorkflowCont
         if (txnInfo.config.storedProc) {
           const $args = [this.workflowUUID, funcId, this.presetUUID, ...args, null]
           const sql = `CALL ${txnInfo.config.storedProc}(${$args.map((v, i) => `$${i + 1}`).join()});`;
-          const [queryResult] = await this.#dbosExec.userDatabase.queryWithClient<{ results: R }>(client, sql, ...$args);
-          return queryResult.results;
+          // eslint-disable-next-line no-useless-catch
+          try {
+            const [queryResult] = await this.#dbosExec.userDatabase.queryWithClient<{ results: R }>(client, sql, ...$args);
+            return queryResult.results;
+          } catch (e) {
+            // PG stored proc errors include a bunch of additional information that we don't want to expose to the user
+            const { detail, message } = e as { detail?: string, message: string };
+            throw new Error(detail ?? message);
+          }
         }
 
         const tCtxt = new TransactionContextImpl(
