@@ -275,11 +275,26 @@ export class WorkflowContextImpl extends DBOSContextImpl implements WorkflowCont
     if (txnInfo === undefined) {
       throw new DBOSNotRegisteredError(txn.name);
     }
+    const funcId = this.functionIDGetIncrement();
+
+    if (txnInfo.config.storedProc) {
+      const $args = [this.workflowUUID, funcId, this.presetUUID, ...args, null]
+      const sql = `CALL ${txnInfo.config.storedProc}(${$args.map((v, i) => `$${i + 1}`).join()});`;
+      // eslint-disable-next-line no-useless-catch
+      try {
+        const [queryResult] = await this.#dbosExec.userDatabase.query<{ results: R }, unknown[]>(sql, ...$args);
+        return queryResult.results;
+      } catch (e) {
+        // PG stored proc errors include a bunch of additional information that we don't want to expose to the user
+        const { detail, message } = e as { detail?: string, message: string };
+        throw new Error(detail ?? message);
+      }
+    }
+
     const readOnly = txnInfo.config.readOnly ?? false;
     let retryWaitMillis = 1;
     const backoffFactor = 1.5;
     const maxRetryWaitMs = 2000; // Maximum wait 2 seconds.
-    const funcId = this.functionIDGetIncrement();
     const span: Span = this.#dbosExec.tracer.startSpan(
       txn.name,
       {
@@ -297,20 +312,6 @@ export class WorkflowContextImpl extends DBOSContextImpl implements WorkflowCont
     // eslint-disable-next-line no-constant-condition
     while (true) {
       const wrappedTransaction = async (client: UserDatabaseClient): Promise<R> => {
-        if (txnInfo.config.storedProc) {
-          const $args = [this.workflowUUID, funcId, this.presetUUID, ...args, null]
-          const sql = `CALL ${txnInfo.config.storedProc}(${$args.map((v, i) => `$${i + 1}`).join()});`;
-          // eslint-disable-next-line no-useless-catch
-          try {
-            const [queryResult] = await this.#dbosExec.userDatabase.queryWithClient<{ results: R }>(client, sql, ...$args);
-            return queryResult.results;
-          } catch (e) {
-            // PG stored proc errors include a bunch of additional information that we don't want to expose to the user
-            const { detail, message } = e as { detail?: string, message: string };
-            throw new Error(detail ?? message);
-          }
-        }
-
         const tCtxt = new TransactionContextImpl(
           this.#dbosExec.userDatabase.getName(), client, this,
           span, this.#dbosExec.logger, funcId, txn.name,
