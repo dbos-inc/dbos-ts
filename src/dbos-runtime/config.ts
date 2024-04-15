@@ -21,6 +21,7 @@ export interface ConfigFile {
     password?: string;
     connectionTimeoutMillis?: number;
     app_db_name: string;
+    sys_db_name?: string;
     ssl_ca?: string;
     app_db_client?: UserDatabaseName;
     migrate?: string[];
@@ -34,6 +35,7 @@ export interface ConfigFile {
   telemetry?: TelemetryConfig;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   application: any;
+  env: Record<string, string>;
   runtimeConfig?: DBOSRuntimeConfig;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dbClientMetadata?: any;
@@ -79,7 +81,7 @@ export function writeConfigFile(configFile: ConfigFile, configFilePath: string) 
   }
 }
 
-export function constructPoolConfig(configFile: ConfigFile, debugMode: boolean = false) {
+export function constructPoolConfig(configFile: ConfigFile, useProxy: boolean = false) {
   if (!configFile.database) {
     throw new DBOSInitializationError(`DBOS configuration (dbos-config.yaml) does not contain database config`);
   }
@@ -98,8 +100,8 @@ export function constructPoolConfig(configFile: ConfigFile, debugMode: boolean =
   }
 
   if (!poolConfig.password) {
-    if (debugMode) {
-      poolConfig.password = "DEBUG-MODE"; // Assign a password if not set. We don't need password to authenticate with the local proxy.
+    if (useProxy) {
+      poolConfig.password = "PROXY-MODE"; // Assign a password if not set. We don't need password to authenticate with the local proxy.
     } else {
       const pgPassword: string | undefined = process.env.PGPASSWORD;
       if (pgPassword) {
@@ -128,7 +130,7 @@ export function constructPoolConfig(configFile: ConfigFile, debugMode: boolean =
  * Parse `dbosConfigFilePath` and return DBOSConfig and DBOSRuntimeConfig
  * Considers DBOSCLIStartOptions if provided, which takes precedence over config file
  * */
-export function parseConfigFile(cliOptions?: DBOSCLIStartOptions, debugMode: boolean = false): [DBOSConfig, DBOSRuntimeConfig] {
+export function parseConfigFile(cliOptions?: DBOSCLIStartOptions, useProxy: boolean = false): [DBOSConfig, DBOSRuntimeConfig] {
   const configFilePath = cliOptions?.configfile ?? dbosConfigFilePath;
   const configFile: ConfigFile | undefined = loadConfigFile(configFilePath);
   if (!configFile) {
@@ -141,7 +143,7 @@ export function parseConfigFile(cliOptions?: DBOSCLIStartOptions, debugMode: boo
   /* Handle user database config */
   /*******************************/
 
-  const poolConfig = constructPoolConfig(configFile, debugMode)
+  const poolConfig = constructPoolConfig(configFile, useProxy)
 
   /***************************/
   /* Handle telemetry config */
@@ -165,9 +167,10 @@ export function parseConfigFile(cliOptions?: DBOSCLIStartOptions, debugMode: boo
     poolConfig: poolConfig,
     userDbclient: configFile.database.app_db_client || UserDatabaseName.KNEX,
     telemetry: configFile.telemetry || undefined,
-    system_database: `${poolConfig.database}_dbos_sys`,
+    system_database: configFile.database.sys_db_name ?? `${poolConfig.database}_dbos_sys`,
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     application: configFile.application || undefined,
+    env: configFile.env || {},
     http: configFile.http,
     dbClientMetadata: {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access

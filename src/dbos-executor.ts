@@ -55,9 +55,11 @@ export interface DBOSConfig {
   readonly userDbclient?: UserDatabaseName;
   readonly telemetry?: TelemetryConfig;
   readonly system_database: string;
+  readonly env?: Record<string, string>
   readonly application?: object;
   readonly dbClientMetadata?: any;
   readonly debugProxy?: string;
+  readonly debugMode?: boolean;
   readonly http?: {
     readonly cors_middleware?: boolean;
     readonly credentials?: boolean;
@@ -133,6 +135,7 @@ export class DBOSExecutor {
   static readonly defaultNotificationTimeoutSec = 60;
 
   readonly debugMode: boolean;
+  readonly debugProxy: string | undefined;
   static systemDBSchemaName = "dbos";
 
   readonly logger: Logger;
@@ -142,7 +145,16 @@ export class DBOSExecutor {
 
   /* WORKFLOW EXECUTOR LIFE CYCLE MANAGEMENT */
   constructor(readonly config: DBOSConfig, systemDatabase?: SystemDatabase) {
-    this.debugMode = config.debugProxy ? true : false;
+    this.debugMode = config.debugMode ?? false;
+    this.debugProxy = config.debugProxy;
+
+    // Set configured environment variables
+    if (config.env) {
+      for (const [key, value] of Object.entries(config.env)) {
+        process.env[key] = value;
+      }
+    }
+
     if (config.telemetry?.OTLPExporter) {
       const OTLPExporter = new TelemetryExporter(config.telemetry.OTLPExporter);
       this.telemetryCollector = new TelemetryCollector(OTLPExporter);
@@ -155,14 +167,16 @@ export class DBOSExecutor {
 
     if (this.debugMode) {
       this.logger.info("Running in debug mode!");
-      try {
-        const url = new URL(this.config.debugProxy!);
-        this.config.poolConfig.host = url.hostname;
-        this.config.poolConfig.port = parseInt(url.port, 10);
-        this.logger.info(`Debugging mode proxy: ${this.config.poolConfig.host}:${this.config.poolConfig.port}`);
-      } catch (err) {
-        this.logger.error(err);
-        throw err;
+      if (this.debugProxy) {
+        try {
+          const url = new URL(this.config.debugProxy!);
+          this.config.poolConfig.host = url.hostname;
+          this.config.poolConfig.port = parseInt(url.port, 10);
+          this.logger.info(`Debugging mode proxy: ${this.config.poolConfig.host}:${this.config.poolConfig.port}`);
+        } catch (err) {
+          this.logger.error(err);
+          throw err;
+        }
       }
     }
 
@@ -293,7 +307,6 @@ export class DBOSExecutor {
       }
     } catch (err) {
       (err as Error).message = `failed to initialize workflow executor: ${(err as Error).message}`
-      this.logger.error(err);
       throw new DBOSInitializationError(`${(err as Error).message}`);
     }
     this.initialized = true;
