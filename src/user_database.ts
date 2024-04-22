@@ -5,6 +5,8 @@ import { IsolationLevel, TransactionConfig } from "./transaction";
 import { ValuesOf } from "./utils";
 import { Knex } from "knex";
 import { DBOSQuery, DBOSQueryImpl } from "./query";
+import { GlobalLogger as Logger } from './telemetry/logs';
+import { NoticeMessage } from "pg-protocol/dist/messages";
 
 export interface UserDatabase {
   init(debugMode?: boolean): Promise<void>;
@@ -50,7 +52,7 @@ export class DBOSQueryUserDatabase implements UserDatabase {
 
   readonly pool: Pool;
 
-  constructor(readonly poolConfig: PoolConfig) {
+  constructor(readonly poolConfig: PoolConfig, readonly logger: Logger) {
     this.pool = new Pool(poolConfig);
   }
 
@@ -66,14 +68,40 @@ export class DBOSQueryUserDatabase implements UserDatabase {
     await this.pool.end();
   }
 
+  #log(msg: NoticeMessage) {
+    switch (msg.severity) {
+      case "INFO":
+      case "LOG":
+      case "NOTICE":
+        this.logger.info(msg.message);
+        break;
+      case "WARNING":
+        this.logger.warn(msg.message);
+        break;
+      case "DEBUG":
+        this.logger.debug(msg.message);
+        break;
+      case "ERROR":
+      case "FATAL":
+      case "PANIC":
+        this.logger.error(msg.message);
+        break;
+      default:
+        this.logger.error(`Unknown notice severity: ${msg.severity} - ${msg.message}`);
+    }
+  }
+
   getName() {
     return UserDatabaseName.DBOSQUERY;
   }
 
+
   async transaction<R, T extends unknown[]>(txn: UserDatabaseTransaction<R, T>, config: TransactionConfig, ...args: T): Promise<R> {
     const client: PoolClient = await this.pool.connect();
+    const log: (msg: NoticeMessage) => void = (msg) => this.#log(msg);
     const dbosQuery: DBOSQuery = new DBOSQueryImpl(client);
     try {
+      client.on('notice', log);
       const readOnly = config.readOnly ?? false;
       const isolationLevel = config.isolationLevel ?? IsolationLevel.Serializable;
       await client.query(`BEGIN ISOLATION LEVEL ${isolationLevel}`);
@@ -87,32 +115,51 @@ export class DBOSQueryUserDatabase implements UserDatabase {
       await client.query(`ROLLBACK`);
       throw err;
     } finally {
+      client.off('notice', log);
       client.release();
     }
   }
 
   async queryFunction<C extends UserDatabaseClient, R, T extends unknown[]>(func: UserDatabaseQuery<C, R, T>, ...args: T): Promise<R> {
     const client: PoolClient = await this.pool.connect();
+    const log: (msg: NoticeMessage) => void = (msg) => this.#log(msg);
     const dbosQuery: DBOSQuery = new DBOSQueryImpl(client);
     try {
+      client.on('notice', log);
       return func(dbosQuery as C, ...args);
     }
     finally {
+      client.off('notice', log);
       client.release();
     }
   }
 
+
   async query<R, T extends unknown[]>(sql: string, ...params: T): Promise<R[]> {
-    return this.pool.query<QueryResultRow>(sql, params).then((value) => {
-      return value.rows as R[];
-    });
+    const client = await this.pool.connect();
+    const log: (msg: NoticeMessage) => void = (msg) => this.#log(msg);
+    try {
+      client.on('notice', log);
+      return await client.query<QueryResultRow>(sql, params).then((value) => {
+        return value.rows as R[];
+      });
+    } finally {
+      client.off('notice', log);
+      client.release();
+    }
   }
 
   async queryWithClient<R, T extends unknown[]>(client: UserDatabaseClient, sql: string, ...params: T): Promise<R[]> {
     const pgClient: PoolClient = client as PoolClient;
-    return pgClient.query<QueryResultRow>(sql, params).then((value) => {
-      return value.rows as R[];
-    });
+    const log: (msg: NoticeMessage) => void = (msg) => this.#log(msg);
+    try {
+      pgClient.on('notice', log);
+      return await pgClient.query<QueryResultRow>(sql, params).then((value) => {
+        return value.rows as R[];
+      });
+    } finally {
+      pgClient.off('notice', log);
+    }
   }
 
   getPostgresErrorCode(error: unknown): string | null {

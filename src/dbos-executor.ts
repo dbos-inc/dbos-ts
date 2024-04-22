@@ -255,7 +255,7 @@ export class DBOSExecutor {
       }
         break;
       case UserDatabaseName.DBOSQUERY: {
-        this.userDatabase = new DBOSQueryUserDatabase(userDBConfig);
+        this.userDatabase = new DBOSQueryUserDatabase(userDBConfig, this.logger);
         this.logger.debug("Loaded DBOS Query user database");
       }
         break;
