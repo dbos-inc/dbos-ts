@@ -296,13 +296,24 @@ export class WorkflowContextImpl extends DBOSContextImpl implements WorkflowCont
     );
 
     if (txnInfo.config.storedProc) {
-      const $args = [this.workflowUUID, funcId, this.presetUUID, ...args, null]
+      const $args = [this.workflowUUID, funcId, this.presetUUID, null, ...args]
       const sql = `CALL ${txnInfo.config.storedProc}(${$args.map((v, i) => `$${i + 1}`).join()});`;
-      // eslint-disable-next-line no-useless-catch
+
+      type ReturnValue = { return_value: { result: R, txn_snapshot?: string }};
       try {
-        const [queryResult] = await this.#dbosExec.userDatabase.query<{ results: R }, unknown[]>(sql, ...$args);
+        const [{ return_value }] = (await this.#dbosExec.userDatabase.query(sql, ...$args)) as [ReturnValue];
+        // buffer the result of read-only transactions if the snapshot is provided
+        // generated stored proc won't return snapshot if result was retrieved from tx output table
+        if (readOnly && return_value.txn_snapshot) {
+          const guardOutput: BufferedResult = {
+            output: return_value.result,
+            txn_snapshot: return_value.txn_snapshot,
+            created_at: Date.now(),
+          }
+          this.resultBuffer.set(funcId, guardOutput);
+        }
         span.setStatus({ code: SpanStatusCode.OK });
-        return queryResult.results;
+        return return_value.result;
       } catch (e) {
         // PG stored proc errors include a bunch of additional information that we don't want to expose to the user
         const { detail, message } = e as { detail?: string, message: string };
