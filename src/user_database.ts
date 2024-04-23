@@ -150,7 +150,7 @@ export class DBOSQueryUserDatabase implements UserDatabase {
   }
 
   async queryWithClient<R, T extends unknown[]>(client: UserDatabaseClient, sql: string, ...params: T): Promise<R[]> {
-    const pgClient: PoolClient = client as PoolClient;
+    const pgClient = (client as DBOSQueryImpl).client;
     const log: (msg: NoticeMessage) => void = (msg) => this.#log(msg);
     try {
       pgClient.on('notice', log);

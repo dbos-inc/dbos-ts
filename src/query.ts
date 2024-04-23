@@ -39,7 +39,7 @@ export interface DBOSQuery {
 
 export class DBOSQueryImpl implements DBOSQuery {
 
-    constructor(private readonly client: PoolClient) { }
+    constructor(readonly client: PoolClient) { }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     query<R extends DBOSQueryResultRow = any, I = any[]>(queryText: string, values?: DBOSQueryConfigValues<I> | undefined): Promise<DBOSQueryResult<R>> {
