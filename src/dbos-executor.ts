@@ -721,7 +721,7 @@ export class DBOSExecutor {
     try {
       let finishedCnt = 0;
       while (finishedCnt < totalSize) {
-        let sqlStmt = "INSERT INTO dbos.transaction_outputs (workflow_uuid, function_id, output, error, txn_id, txn_snapshot, created_at) VALUES ";
+        let sqlStmt = "INSERT INTO dbos.transaction_outputs (workflow_uuid, function_id, output, txn_snapshot, created_at) VALUES ";
         let paramCnt = 1;
         const values: any[] = [];
         const batchUUIDs: string[] = [];
@@ -733,8 +733,8 @@ export class DBOSExecutor {
             if (paramCnt > 1) {
               sqlStmt += ", ";
             }
-            sqlStmt += `($${paramCnt++}, $${paramCnt++}, $${paramCnt++}, $${paramCnt++}, null, $${paramCnt++}, $${paramCnt++})`;
-            values.push(workflowUUID, funcID, JSON.stringify(output), JSON.stringify(null), txnSnapshot, createdAt);
+            sqlStmt += `($${paramCnt++}, $${paramCnt++}, $${paramCnt++}, $${paramCnt++}, $${paramCnt++})`;
+            values.push(workflowUUID, funcID, JSON.stringify(output), txnSnapshot, createdAt);
           }
           batchUUIDs.push(workflowUUID);
           finishedCnt++;

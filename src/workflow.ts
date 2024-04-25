@@ -175,7 +175,7 @@ export class WorkflowContextImpl extends DBOSContextImpl implements WorkflowCont
     }
     funcIDs.sort();
     try {
-      let sqlStmt = "INSERT INTO dbos.transaction_outputs (workflow_uuid, function_id, output, error, txn_id, txn_snapshot, created_at) VALUES ";
+      let sqlStmt = "INSERT INTO dbos.transaction_outputs (workflow_uuid, function_id, output, txn_snapshot, created_at) VALUES ";
       let paramCnt = 1;
       const values: any[] = [];
       for (const funcID of funcIDs) {
@@ -188,8 +188,8 @@ export class WorkflowContextImpl extends DBOSContextImpl implements WorkflowCont
         if (paramCnt > 1) {
           sqlStmt += ", ";
         }
-        sqlStmt += `($${paramCnt++}, $${paramCnt++}, $${paramCnt++}, $${paramCnt++}, null, $${paramCnt++}, $${paramCnt++})`;
-        values.push(this.workflowUUID, funcID, JSON.stringify(output), JSON.stringify(null), txnSnapshot, createdAt);
+        sqlStmt += `($${paramCnt++}, $${paramCnt++}, $${paramCnt++}, $${paramCnt++}, $${paramCnt++})`;
+        values.push(this.workflowUUID, funcID, JSON.stringify(output), txnSnapshot, createdAt);
       }
       this.logger.debug(sqlStmt);
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
