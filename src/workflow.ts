@@ -285,10 +285,17 @@ export class WorkflowContextImpl extends DBOSContextImpl implements WorkflowCont
 
     if (txnInfo.config.storedProc) {
 
-      // TODO: flush result buffer for read/write transactions
+      const $args = [this.workflowUUID, funcId, this.presetUUID, null, ...args];
+      if (!readOnly) {
+        // function_id, output, txn_snapshot, created_at
+        const bufferedResults = new Array<[number, unknown, string, number?]>();
+        for (const [functionID, { output, txn_snapshot, created_at }] of this.resultBuffer.entries()) {
+          bufferedResults.push([functionID, output, txn_snapshot, created_at]);
+        }
+        $args.unshift(bufferedResults.length > 0 ? JSON.stringify(bufferedResults) : null);
+      }
 
-      const $args = [this.workflowUUID, funcId, this.presetUUID, null, ...args]
-      const sql = `CALL ${txnInfo.config.storedProc}(${$args.map((v, i) => `$${i + 1}`).join()});`;
+      const sql = `CALL ${txnInfo.config.storedProc}(${$args.map((_v, i) => `$${i + 1}`).join()});`;
 
       type ReturnValue = { return_value: { output?: R, error?: any, txn_id?: string, txn_snapshot?: string, created_at?: number }};
       try {
@@ -314,6 +321,10 @@ export class WorkflowContextImpl extends DBOSContextImpl implements WorkflowCont
             txn_snapshot,
             created_at: created_at ?? Date.now(),
           });
+        }
+
+        if (!readOnly) {
+          this.resultBuffer.clear();
         }
 
         if (txn_id) {
