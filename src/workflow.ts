@@ -284,30 +284,47 @@ export class WorkflowContextImpl extends DBOSContextImpl implements WorkflowCont
     );
 
     if (txnInfo.config.storedProc) {
+
+      // TODO: flush result buffer for read/write transactions
+
       const $args = [this.workflowUUID, funcId, this.presetUUID, null, ...args]
       const sql = `CALL ${txnInfo.config.storedProc}(${$args.map((v, i) => `$${i + 1}`).join()});`;
 
-      type ReturnValue = { return_value: { result: R, txn_snapshot?: string }};
+      type ReturnValue = { return_value: { output?: R, error?: any, txn_id?: string, txn_snapshot?: string, created_at?: number }};
       try {
-        const [{ return_value }] = (await this.#dbosExec.userDatabase.query(sql, ...$args)) as [ReturnValue];
-        // buffer the result of read-only transactions if the snapshot is provided
-        // generated stored proc won't return snapshot if result was retrieved from tx output table
-        if (readOnly && return_value.txn_snapshot) {
-          const guardOutput: BufferedResult = {
-            output: return_value.result,
-            txn_snapshot: return_value.txn_snapshot,
-            created_at: Date.now(),
-          }
-          this.resultBuffer.set(funcId, guardOutput);
+        const [{ return_value }]  = await this.#dbosExec.userDatabase.query<ReturnValue, unknown[]>(sql, ...$args);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const { error, output, txn_snapshot, txn_id, created_at } = return_value;
+
+        // if the stored proc returns an error, deserialize and throw it. 
+        // stored proc saves the error in tx_output before returning 
+        if (error) {
+          throw deserializeError(error);
+        }
+
+        // either error or output is expected to be set
+        if (output === undefined) {
+          throw new Error("Stored procedure did not return output or error");
+        }
+
+        // if txn_snapshot is provided, the output needs to be buffered
+        if (readOnly && txn_snapshot) {
+          this.resultBuffer.set(funcId, {
+            output,
+            txn_snapshot,
+            created_at: created_at ?? Date.now(),
+          });
+        }
+
+        if (txn_id) {
+          span.setAttribute("pg_txn_id", txn_id);
         }
         span.setStatus({ code: SpanStatusCode.OK });
-        return return_value.result;
+        return output;
       } catch (e) {
-        // PG stored proc errors include a bunch of additional information that we don't want to expose to the user
-        const { detail, message } = e as { detail?: string, message: string };
-        const errorMsg = detail ?? message;
-        span.setStatus({ code: SpanStatusCode.ERROR, message: errorMsg });
-        throw new Error(errorMsg);
+        const { message } = e as { message: string };
+        span.setStatus({ code: SpanStatusCode.ERROR, message });
+        throw e;
       } finally {
         this.#dbosExec.tracer.endSpan(span);
       }
