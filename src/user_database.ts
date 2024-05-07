@@ -281,13 +281,12 @@ export class PGNodeUserDatabase implements UserDatabase {
     return pge === "23505";
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async createSchema(): Promise<void> {
-    throw new Error("createSchema() is not supported in PG user database.");
+    return Promise.reject(new Error("createSchema() is not supported in PG user database."));
   }
-  // eslint-disable-next-line @typescript-eslint/require-await
+
   async dropSchema(): Promise<void> {
-    throw new Error("dropSchema() is not supported in PG user database.");
+    return Promise.reject( new Error("dropSchema() is not supported in PG user database."));
   }
 }
 
@@ -335,7 +334,6 @@ export class PrismaUserDatabase implements UserDatabase {
   }
 
   async transaction<R, T extends unknown[]>(transaction: UserDatabaseTransaction<R, T>, config: TransactionConfig, ...args: T): Promise<R> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     let isolationLevel: string;
     if (config.isolationLevel === IsolationLevel.ReadUncommitted) {
       isolationLevel = PrismaIsolationLevel.ReadUncommitted;
@@ -384,18 +382,16 @@ export class PrismaUserDatabase implements UserDatabase {
     return pge === "23505";
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async createSchema(): Promise<void> {
-    throw new Error("createSchema() is not supported in Prisma user database.");
+    return Promise.reject(new Error("createSchema() is not supported in Prisma user database."));
   }
-  // eslint-disable-next-line @typescript-eslint/require-await
+
   async dropSchema(): Promise<void> {
-    throw new Error("dropSchema() is not supported in Prisma user database.");
+    return Promise.reject(new Error("dropSchema() is not supported in Prisma user database."));
   }
 }
 
-export interface TypeORMDataSource {
-
+interface TypeORMDataSource {
   readonly isInitialized: boolean;
   readonly manager: TypeORMEntityManager;
   initialize(): Promise<this>;
@@ -406,12 +402,12 @@ export interface TypeORMDataSource {
   dropDatabase(): Promise<void>;
 }
 
-export interface TypeORMEntityManager {
+interface TypeORMEntityManager {
   query<R, T extends unknown[]>(query: string, parameters?: T): Promise<R>
   transaction<R>(isolationLevel: IsolationLevel, runinTransaction: (entityManager: TypeORMEntityManager) => Promise<R>): Promise<R>
 }
 
-export interface QueryFailedError<T> {
+interface QueryFailedError<T> {
   driverError: T
 }
 
@@ -526,7 +522,6 @@ export class KnexUserDatabase implements UserDatabase {
   }
 
   async transaction<R, T extends unknown[]>(transactionFunction: UserDatabaseTransaction<R, T>, config: TransactionConfig, ...args: T): Promise<R> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     let isolationLevel: Knex.IsolationLevels;
     if (config.isolationLevel === IsolationLevel.ReadUncommitted) {
       isolationLevel = "read uncommitted";
@@ -584,12 +579,11 @@ export class KnexUserDatabase implements UserDatabase {
     return pge === "23505";
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async createSchema(): Promise<void> {
-    throw new Error("createSchema() is not supported in Knex user database.");
+    return Promise.reject(new Error("createSchema() is not supported in Knex user database."));
   }
-  // eslint-disable-next-line @typescript-eslint/require-await
+
   async dropSchema(): Promise<void> {
-    throw new Error("dropSchema() is not supported in Knex user database.");
+    return Promise.reject(new Error("dropSchema() is not supported in Knex user database."));
   }
 }

@@ -55,7 +55,7 @@ async function createZipData(logger: CLILogger): Promise<string> {
     return buffer.toString('base64');
 }
 
-export async function deployAppCode(host: string, rollback: boolean, verbose: boolean): Promise<number> {
+export async function deployAppCode(host: string, rollback: boolean, previousVersion: string | null, verbose: boolean, targetDatabaseName: string | null = null): Promise<number> {
   const logger = getLogger(verbose);
   logger.debug("Getting cloud credentials...");
   const userCredentials = await getCloudCredentials();
@@ -79,14 +79,27 @@ export async function deployAppCode(host: string, rollback: boolean, verbose: bo
   logger.debug("  ... package-lock.json exists.");
 
   try {
-    logger.debug("Creating application zip ...");
-    const zipData = await createZipData(logger);
-    logger.debug("  ... application zipped.");
+    const body: {application_archive?: string, previous_version?: string, target_database_name?: string} = {}
+    if (previousVersion === null) {
+      logger.debug("Creating application zip ...");
+      body.application_archive = await createZipData(logger);
+      logger.debug("  ... application zipped.");
+    } else {
+      logger.info(`Restoring previous version ${previousVersion}`);
+      body.previous_version = previousVersion
+    }
+
+    if (targetDatabaseName !== null) {
+      logger.info(`Changing database instance for ${appName} to ${targetDatabaseName} and redeploying`)
+      body.target_database_name = targetDatabaseName;
+    }
 
     // Submit the deploy request
     let url = '';
     if (rollback) {
       url = `https://${host}/v1alpha1/${userCredentials.userName}/applications/${appName}/rollback`;
+    } else if (targetDatabaseName !== null) {
+      url = `https://${host}/v1alpha1/${userCredentials.userName}/applications/${appName}/changedbinstance`;
     } else {
       url = `https://${host}/v1alpha1/${userCredentials.userName}/applications/${appName}`;
     }
@@ -94,9 +107,7 @@ export async function deployAppCode(host: string, rollback: boolean, verbose: bo
     logger.info(`Submitting deploy request for ${appName}`)
     const response = await axios.post(
       url,
-      {
-        application_archive: zipData,
-      },
+      body,
       {
         headers: {
           "Content-Type": "application/json",

@@ -3,7 +3,7 @@ import fs from "fs";
 import { AxiosError } from "axios";
 import jwt from 'jsonwebtoken';
 import path from "node:path";
-import { authenticateWithRefreshToken } from "./authentication.js";
+import { authenticateWithRefreshToken } from "./users/authentication.js";
 
 export interface DBOSCloudCredentials {
   token: string;
@@ -63,7 +63,6 @@ const consoleFormat = format.combine(
 
     const messageString: string = typeof message === "string" ? message : JSON.stringify(message);
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     return `${ts} [${level}]: ${messageString} ${stack ? "\n" + formattedStack : ""}`;
   })
 );

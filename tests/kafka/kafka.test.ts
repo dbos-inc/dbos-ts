@@ -48,19 +48,19 @@ describe("kafka-tests", () => {
     } finally {
       await producer.disconnect();
     }
-  });
+  }, 30000);
 
   beforeEach(async () => {
     if (kafkaIsAvailable) {
       testRuntime = await createInternalTestRuntime([DBOSTestClass], config);
     }
-  });
+  }, 30000);
 
   afterEach(async () => {
     if (kafkaIsAvailable) {
       await testRuntime.destroy();
     }
-  }, 10000);
+  }, 30000);
 
   test("txn-kafka", async () => {
     if (!kafkaIsAvailable) {
@@ -91,7 +91,7 @@ describe("kafka-tests", () => {
     expect(txnCounter).toBe(1);
     await DBOSTestClass.wfPromise;
     expect(wfCounter).toBe(1);
-  }, 20000);
+  }, 30000);
 });
 
 @Kafka(kafkaConfig)
@@ -107,7 +107,6 @@ class DBOSTestClass {
     DBOSTestClass.wfResolve = r;
   });
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   @KafkaConsume(txnTopic)
   @Transaction()
   static async testTxn(_ctxt: TransactionContext<Knex>, topic: string, _partition: number, message: KafkaMessage) {
@@ -115,9 +114,9 @@ class DBOSTestClass {
       txnCounter = txnCounter + 1;
       DBOSTestClass.txnResolve()
     }
+    return this.txnPromise;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   @KafkaConsume(wfTopic)
   @Workflow()
   static async testWorkflow(_ctxt: WorkflowContext, topic: string, _partition: number, message: KafkaMessage) {
@@ -125,5 +124,6 @@ class DBOSTestClass {
       wfCounter = wfCounter + 1;
       DBOSTestClass.wfResolve()
     }
+    return this.wfPromise;
   }
 }

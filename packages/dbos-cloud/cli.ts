@@ -2,17 +2,16 @@
 
 import {
   registerApp,
-  updateApp,
   listApps,
   deleteApp,
   deployAppCode,
   getAppLogs,
 } from "./applications/index.js";
 import { Command } from 'commander';
-import { login } from "./login.js";
-import { registerUser } from "./register.js";
-import { createUserDb, getUserDb, deleteUserDb, listUserDB, resetDBCredentials, linkUserDB, unlinkUserDB } from "./userdb.js";
-import { launchDashboard, getDashboardURL } from "./dashboards.js";
+import { login } from "./users/login.js";
+import { registerUser } from "./users/register.js";
+import { createUserDb, getUserDb, deleteUserDb, listUserDB, resetDBCredentials, linkUserDB, unlinkUserDB, restoreUserDB } from "./databases/databases.js";
+import { launchDashboard, getDashboardURL } from "./dashboards/dashboards.js";
 import { DBOSCloudHost, credentialsExist, deleteCredentials, getLogger } from "./cloudutils.js";
 import { getAppInfo } from "./applications/get-app-info.js";
 import promptSync from 'prompt-sync';
@@ -21,8 +20,8 @@ import fs from "fs";
 import { fileURLToPath } from 'url';
 import path from "path";
 import updateNotifier, { Package } from "update-notifier";
-import { profile } from "./profile.js";
-import { revokeRefreshToken } from "./authentication.js";
+import { profile } from "./users/profile.js";
+import { revokeRefreshToken } from "./users/authentication.js";
 
 // Read local package.json
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -52,7 +51,6 @@ try {
 
 const program = new Command();
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 program.version(packageJson.version);
 
 /////////////////////
@@ -128,19 +126,12 @@ applicationCommands
   });
 
 applicationCommands
-  .command('update')
-  .description('Update this application')
-  .action(async () => {
-    const exitCode = await updateApp(DBOSCloudHost);
-    process.exit(exitCode);
-  });
-
-applicationCommands
   .command('deploy')
   .description('Deploy this application to the cloud and run associated database migration commands')
   .option('--verbose', 'Verbose log of deployment step')
-  .action(async (options: {verbose?: boolean}) => {
-    const exitCode = await deployAppCode(DBOSCloudHost, false, options.verbose ?? false);
+  .option('-p, --previous-version <string>', 'Specify a previous version to restore')
+  .action(async (options: {verbose?: boolean, previousVersion?: string}) => {
+    const exitCode = await deployAppCode(DBOSCloudHost, false, options.previousVersion ?? null, options.verbose ?? false);
     process.exit(exitCode);
   });
 
@@ -148,7 +139,18 @@ applicationCommands
   .command('rollback')
   .description('Deploy this application to the cloud and run associated database rollback commands')
   .action(async () => {
-    const exitCode = await deployAppCode(DBOSCloudHost, true, false);
+    const exitCode = await deployAppCode(DBOSCloudHost, true, null, false);
+    process.exit(exitCode);
+  });
+
+applicationCommands
+  .command('change-database-instance')
+  .description('Change this application\'s database instance and redeploy it')
+  .option('--verbose', 'Verbose log of deployment step')
+  .option('-p, --previous-version <string>', 'Specify a previous version to restore')
+  .requiredOption('-d, --database <string>', 'Specify the new database instance name for this application')
+  .action(async (options: {verbose?: boolean, previousVersion?: string, database: string}) => {
+    const exitCode = await deployAppCode(DBOSCloudHost, false, options.previousVersion ?? null, options.verbose ?? false, options.database);
     process.exit(exitCode);
   });
 
@@ -255,6 +257,17 @@ databaseCommands
   .action((async (dbname: string) => {
     const exitCode = await deleteUserDb(DBOSCloudHost, dbname)
     process.exit(exitCode);
+  }))
+
+databaseCommands
+  .command('restore')
+  .description("Restore a Postgres database instance to a specified point in time")
+  .argument('<name>', 'database instance name')
+  .requiredOption('-t, --restore-time <string>', 'Specify the point in time to which to restore the database. Must be a timestamp in RFC 3339 format. Example: 2009-09-07T23:45:00Z')
+  .requiredOption('-n, --target-name <string>', 'Specify the new database instance name')
+  .action((async (dbname: string, options: { restoreTime: string, targetName: string}) => {
+    const exitCode = await restoreUserDB(DBOSCloudHost, dbname, options.targetName, options.restoreTime, true);
+    process.exit(exitCode)
   }))
 
 databaseCommands
