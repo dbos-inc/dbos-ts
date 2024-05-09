@@ -305,11 +305,6 @@ export class WorkflowContextImpl extends DBOSContextImpl implements WorkflowCont
           throw deserializeError(error);
         }
 
-        // either error or output is expected to be set
-        if (output === undefined) {
-          throw new Error("Stored procedure did not return output or error");
-        }
-
         // if txn_snapshot is provided, the output needs to be buffered
         if (readOnly && txn_snapshot) {
           this.resultBuffer.set(funcId, {
@@ -327,7 +322,7 @@ export class WorkflowContextImpl extends DBOSContextImpl implements WorkflowCont
           span.setAttribute("pg_txn_id", txn_id);
         }
         span.setStatus({ code: SpanStatusCode.OK });
-        return output;
+        return output!; // output will be undefined if tx function returns void
       } catch (e) {
         const { message } = e as { message: string };
         span.setStatus({ code: SpanStatusCode.ERROR, message });
