@@ -54,7 +54,8 @@
             "pg-node",
             "prisma",
             "typeorm",
-            "knex"
+            "knex",
+            "dbos-query"
           ]
         },
         "migrate": {
