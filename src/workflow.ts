@@ -288,6 +288,8 @@ export class WorkflowContextImpl extends DBOSContextImpl implements WorkflowCont
         for (const [functionID, { output, txn_snapshot, created_at }] of this.resultBuffer.entries()) {
           bufferedResults.push([functionID, output, txn_snapshot, created_at]);
         }
+        // sort by function ID
+        bufferedResults.sort((a, b) => a[0] - b[0]);
         $args.unshift(bufferedResults.length > 0 ? JSON.stringify(bufferedResults) : null);
       }
 
@@ -298,6 +300,11 @@ export class WorkflowContextImpl extends DBOSContextImpl implements WorkflowCont
         const [{ return_value }]  = await this.#dbosExec.userDatabase.query<ReturnValue, unknown[]>(sql, ...$args);
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const { error, output, txn_snapshot, txn_id, created_at } = return_value;
+
+        // buffered results are persisted in r/w stored procs, even if it returns an error
+        if (!readOnly) {
+          this.resultBuffer.clear();
+        }
 
         // if the stored proc returns an error, deserialize and throw it. 
         // stored proc saves the error in tx_output before returning 
