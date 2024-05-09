@@ -13,9 +13,7 @@
             "args": [
                 "start",
                 "-c",
-                "/home/harry/apps/plv8-proto/dbos-config.yaml",
-                "-e",
-                "/home/harry/apps/plv8-proto/dist/operations.js"
+                "/home/harry/apps/widget-store-plv8-proto/dbos-config.yaml",
             ],
             "console": "integratedTerminal"
         },
