@@ -43,7 +43,6 @@ export {
 
 export {
   LogMasks,
-  Debug,
 
   // Parameter Decorators
   ArgRequired,
@@ -103,4 +102,10 @@ export {
 export {
   Kafka,
   KafkaConsume,
-} from "./kafka/kafka"
+} from "./kafka/kafka";
+
+export {
+  SchedulerMode,
+  SchedulerConfig,
+  Scheduled,
+} from "./scheduler/scheduler";
