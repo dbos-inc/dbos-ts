@@ -15,24 +15,24 @@ export default tseslint.config({
     }
   },
   rules: {
-    // "@typescript-eslint/indent": "off",
-    // "@typescript-eslint/unbound-method": [
-    //   "error",
-    //   {
-    //     ignoreStatic: true,
-    //   },
-    // ],
+    "@typescript-eslint/indent": "off",
+    "@typescript-eslint/unbound-method": [
+      "error",
+      {
+        ignoreStatic: true,
+      },
+    ],
     "@typescript-eslint/no-unused-vars": [
       "error",
       { "argsIgnorePattern": "^_",
         "varsIgnorePattern": "^_" }
     ],
-    // "@typescript-eslint/no-misused-promises": [
-    //   "error",
-    //   {
-    //     "checksVoidReturn": false
-    //   }
-    // ]
+    "@typescript-eslint/no-misused-promises": [
+      "error",
+      {
+        "checksVoidReturn": false
+      }
+    ]
   },
 },
 {
@@ -47,7 +47,3 @@ export default tseslint.config({
     '@typescript-eslint/explicit-function-return-type': 'off',
   },
 });
-
-// eslint.configs.recommended,
-// ...tseslint.configs.recommended,
-// ...tseslint.configs.recommendedTypeChecked,
