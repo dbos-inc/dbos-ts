@@ -27,6 +27,7 @@
     "dbos-sdk": "./dist/src/dbos-runtime/cli.js"
   },
   "devDependencies": {
+    "@eslint/js": "^9.3.0",
     "@prisma/client": "^5.3.1",
     "@types/inquirer": "^8.2.10",
     "@types/koa": "^2.15.0",
@@ -37,8 +38,6 @@
     "@types/pg": "^8.11.2",
     "@types/supertest": "^6.0.2",
     "@types/uuid": "^9.0.8",
-    "@typescript-eslint/eslint-plugin": "^6.7.2",
-    "@typescript-eslint/parser": "^6.7.2",
     "eslint": "^8.57.0",
     "grunt": "^1.6.1",
     "jest": "^29.7.0",
@@ -47,7 +46,8 @@
     "supertest": "^7.0.0",
     "ts-jest": "^29.1.2",
     "typeorm": "^0.3.17",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "typescript-eslint": "^7.10.0"
   },
   "dependencies": {
     "@koa/bodyparser": "5.0.0",
